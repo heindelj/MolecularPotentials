@@ -25,3 +25,5 @@ Manifest.toml
 
 Reference_Implementation
 Reference_Implementation/*
+
+*.code-workspace
