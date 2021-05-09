@@ -1,0 +1,4 @@
+name = "MolecularPotentials"
+uuid = "1d9286e9-d1cd-46d1-a9f9-6ebe9c4167c6"
+authors = ["Joe Heindel <heindelj@uw.edu>"]
+version = "0.1.0"
