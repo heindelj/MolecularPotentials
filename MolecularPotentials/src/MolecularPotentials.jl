@@ -1,5 +1,5 @@
 module MolecularPotentials
+    include("AbstractMolecule.jl")
+    include("AbstractPotential.jl")
 
-greet() = print("Hello World!")
-
-end # module
+end
