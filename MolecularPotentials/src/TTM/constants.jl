@@ -105,12 +105,6 @@ const global  idx2 = [
         8.9664665907006e-02,-1.4003228575602e-01,-1.3321543452254e-01,
        -1.8340983193745e-01, 2.3426707273520e-01, 1.5141050914514e-01]
 
-const global b1D = 1.0;
-const global a = 0.2999e0;
-const global b = -0.6932e0;
-const global c0 = 1.0099e0;
-const global c1 = -0.1801e0;
-const global c2 = 0.0892e0;
 
 function get_c5z()
     """
@@ -476,4 +470,15 @@ const global PS_Constants = (;
         phh1A   = 16.94879431193463,
         phh2    = 12.66426998162947,
         f5z     = 0.999677885,
-        c5z     = get_c5z())
+        c5z     = get_c5z(),
+        b1D     = 1.0,
+        a       = 0.2999,
+        b       = -0.6932,
+        c0      = 1.0099,
+        c1      = -0.1801,
+        c2      = 0.0892,
+        #ttm3 dms parameters
+        dms_param1 = 0.5,
+        dms_param2 = 0.9578,
+        dms_param3 = 0.012
+)
