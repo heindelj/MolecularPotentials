@@ -92,7 +92,6 @@ let # scope all the constants we need for this potential
     function dms_nasa!(coords::SMatrix{3, 3, Float64}, q::MVector{3, Float64}, q_derivative::Union{MArray{Tuple{3, 3, 3}, Float64, 3, 27}, Nothing}=nothing, ttm3::Bool=false)        
         rOH1::SVector{3, Float64} = coords[:, 1] - coords[:, 2]
         rOH2::SVector{3, Float64} = coords[:, 1] - coords[:, 3]
-        #rHH::SVector{3, Float64}  = coords[:, 2] - coords[:, 3]
 
         cosθ::Float64 = rOH1 ⋅ rOH2 / (norm(rOH1) * norm(rOH2))
         
@@ -144,21 +143,21 @@ let # scope all the constants we need for this potential
                 continue
             end
     
-            dp1dr1   += coefD[j+1]*(inI) * fmat[1, inI]         * fmat[2, inJ + 1]     * fmat[3, inK + 1]
-            dp1dr2   += coefD[j+1]*(inJ) * fmat[1, inI + 1]     * fmat[2, inJ]         * fmat[3, inK + 1]
-            dp1dcabc += coefD[j+1]*(inK) * fmat[1, inI + 1]     * fmat[2, inJ + 1]     * fmat[3, inK]
-            dp2dr1   += coefD[j+1]*(inJ) * fmat[1, inJ]         * fmat[2, inI + 1]     * fmat[3, inK + 1]
-            dp2dr2   += coefD[j+1]*(inI) * fmat[1, inJ + 1]     * fmat[2, inI]         * fmat[3, inK + 1]
-            dp2dcabc += coefD[j+1]*(inK) * fmat[1, inJ + 1]     * fmat[2, inI + 1]     * fmat[3, inK]
+            dp1dr1   += coefD[j+1] * (inI-1) * fmat[1, inI]         * fmat[2, inJ + 1]     * fmat[3, inK + 1]
+            dp1dr2   += coefD[j+1] * (inJ-1) * fmat[1, inI + 1]     * fmat[2, inJ]         * fmat[3, inK + 1]
+            dp1dcabc += coefD[j+1] * (inK-1) * fmat[1, inI + 1]     * fmat[2, inJ + 1]     * fmat[3, inK]
+            dp2dr1   += coefD[j+1] * (inJ-1) * fmat[1, inJ]         * fmat[2, inI + 1]     * fmat[3, inK + 1]
+            dp2dr2   += coefD[j+1] * (inI-1) * fmat[1, inJ + 1]     * fmat[2, inI]         * fmat[3, inK + 1]
+            dp2dcabc += coefD[j+1] * (inK-1) * fmat[1, inJ + 1]     * fmat[2, inI + 1]     * fmat[3, inK]
         end
 
         xx::Float64  = 5.291772109200e-01
         xx2::Float64 = xx * xx
     
-        dp1dr1 /= C.reoh / xx
-        dp1dr2 /= C.reoh / xx
-        dp2dr1 /= C.reoh / xx
-        dp2dr2 /= C.reoh / xx
+        dp1dr1 /= (C.reoh / xx)
+        dp1dr2 /= (C.reoh / xx)
+        dp2dr1 /= (C.reoh / xx)
+        dp2dr2 /= (C.reoh / xx)
     
         pc0::Float64 = C.a * (norm(rOH1)^C.b + norm(rOH2)^C.b) * (C.c0 + pl1 * C.c1 + pl2 * C.c2)
     
@@ -279,6 +278,9 @@ let # scope all the constants we need for this potential
         q_derivative[1, 3, 3] = -(q_derivative[1, 1, 3] + q_derivative[1, 2, 3])
         q_derivative[2, 3, 3] = -(q_derivative[2, 1, 3] + q_derivative[2, 2, 3])
         q_derivative[3, 3, 3] = -(q_derivative[3, 1, 3] + q_derivative[3, 2, 3])
+        
+        # for some reason I'm off by a minus sign compared to reference...
+        @views q_derivative[:, :, :] *= -1
         return
     end
 end # end of local scope
