@@ -1,5 +1,5 @@
-using MolecularPotentials
 using StaticArrays
+using LinearAlgebra
 include("constants.jl")
 
 let # scope all the constants we need for this potential
@@ -91,7 +91,7 @@ let # scope all the constants we need for this potential
     function dms_nasa!(coords::SMatrix{3, 3, Float64}, q::MVector{3, Float64}, q_derivative::Union{MArray{Tuple{3, 3, 3}, Float64, 3, 27}, Nothing}=nothing, ttm3::Bool=false)        
         rOH1::SVector{3, Float64} = coords[:, 1] - coords[:, 2]
         rOH2::SVector{3, Float64} = coords[:, 1] - coords[:, 3]
-        rHH ::SVector{3, Float64} = coords[:, 2] - coords[:, 3]
+        #rHH::SVector{3, Float64}  = coords[:, 2] - coords[:, 3]
 
         cosθ::Float64 = rOH1 ⋅ rOH2 / (norm(rOH1) * norm(rOH2))
         
@@ -102,10 +102,11 @@ let # scope all the constants we need for this potential
         x1::Float64     = (norm(rOH1) - C.reoh) / C.reoh
         x2::Float64     = (norm(rOH2) - C.reoh) / C.reoh
         x3::Float64     = cosθ - cosθ_e
+        println("here")
 
         efac::Float64 = exp(-C.b1D * ((norm(rOH1) - C.reoh)^2 + (norm(rOH2) - C.reoh)^2))
-
         # SPEED: might be able to speed this up by making it 16,3?
+        println("here")
         fmat = @MMatrix zeros(3, 16)
         for i in 1:3
             fmat[i, 1] = 0.0
