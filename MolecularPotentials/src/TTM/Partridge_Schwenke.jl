@@ -1,5 +1,6 @@
 using StaticArrays
 using LinearAlgebra
+include("/home/heindelj/dev/julia_development/wally/src/molecule_tools/units.jl")
 include("constants.jl")
 
 let # scope all the constants we need for this potential
@@ -29,7 +30,7 @@ let # scope all the constants we need for this potential
         x3::Float64     = cosθ - cosθ_e
 
         # SPEED: might be able to speed this up by making it 16,3?
-        fmat = @MMatrix zeros(3, 16)
+        fmat = zeros(3, 16)
         for i in 1:3
             fmat[i, 1] = 0.0
             fmat[i, 2] = 1.0
@@ -102,12 +103,10 @@ let # scope all the constants we need for this potential
         x1::Float64     = (norm(rOH1) - C.reoh) / C.reoh
         x2::Float64     = (norm(rOH2) - C.reoh) / C.reoh
         x3::Float64     = cosθ - cosθ_e
-        println("here")
 
         efac::Float64 = exp(-C.b1D * ((norm(rOH1) - C.reoh)^2 + (norm(rOH2) - C.reoh)^2))
         # SPEED: might be able to speed this up by making it 16,3?
-        println("here")
-        fmat = @MMatrix zeros(3, 16)
+        fmat = zeros(3, 16)
         for i in 1:3
             fmat[i, 1] = 0.0
             fmat[i, 2] = 1.0
@@ -145,12 +144,12 @@ let # scope all the constants we need for this potential
                 continue
             end
     
-            dp1dr1   += coefD[j]*(inI) * fmat[1][inI]         * fmat[2][inJ + 1]     * fmat[3][inK + 1]
-            dp1dr2   += coefD[j]*(inJ) * fmat[1][inI + 1]     * fmat[2][inJ]         * fmat[3][inK + 1]
-            dp1dcabc += coefD[j]*(inK) * fmat[1][inI + 1]     * fmat[2][inJ + 1]     * fmat[3][inK]
-            dp2dr1   += coefD[j]*(inJ) * fmat[1][inJ]         * fmat[2][inI + 1]     * fmat[3][inK + 1]
-            dp2dr2   += coefD[j]*(inI) * fmat[1][inJ + 1]     * fmat[2][inI]         * fmat[3][inK + 1]
-            dp2dcabc += coefD[j]*(inK) * fmat[1][inJ + 1]     * fmat[2][inI + 1]     * fmat[3][inK]
+            dp1dr1   += coefD[j+1]*(inI) * fmat[1, inI]         * fmat[2, inJ + 1]     * fmat[3, inK + 1]
+            dp1dr2   += coefD[j+1]*(inJ) * fmat[1, inI + 1]     * fmat[2, inJ]         * fmat[3, inK + 1]
+            dp1dcabc += coefD[j+1]*(inK) * fmat[1, inI + 1]     * fmat[2, inJ + 1]     * fmat[3, inK]
+            dp2dr1   += coefD[j+1]*(inJ) * fmat[1, inJ]         * fmat[2, inI + 1]     * fmat[3, inK + 1]
+            dp2dr2   += coefD[j+1]*(inI) * fmat[1, inJ + 1]     * fmat[2, inI]         * fmat[3, inK + 1]
+            dp2dcabc += coefD[j+1]*(inK) * fmat[1, inJ + 1]     * fmat[2, inI + 1]     * fmat[3, inK]
         end
 
         xx::Float64  = 5.291772109200e-01
@@ -280,6 +279,6 @@ let # scope all the constants we need for this potential
         q_derivative[1, 3, 3] = -(q_derivative[1, 1, 3] + q_derivative[1, 2, 3])
         q_derivative[2, 3, 3] = -(q_derivative[2, 1, 3] + q_derivative[2, 2, 3])
         q_derivative[3, 3, 3] = -(q_derivative[3, 1, 3] + q_derivative[3, 2, 3])
+        return
     end
-
 end # end of local scope
