@@ -279,7 +279,7 @@ let # scope all the constants we need for this potential
         q_derivative[2, 3, 3] = -(q_derivative[2, 1, 3] + q_derivative[2, 2, 3])
         q_derivative[3, 3, 3] = -(q_derivative[3, 1, 3] + q_derivative[3, 2, 3])
         
-        # for some reason I'm off by a minus sign compared to reference...
+        # for some reason I'm off by a minus sign compared to reference so multiply by -1...
         @views q_derivative[:, :, :] *= -1
         return
     end
