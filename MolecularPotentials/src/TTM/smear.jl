@@ -31,5 +31,5 @@ struct Smear_TTM4 <: Smear
     smear1::Function
     smear2::Function
     smear3::Function
-    Smear_TTM4() = new(0.4, 0.4, 0.055, 0.626)
+    Smear_TTM4() = new(0.4, 0.4, 0.055, 0.626, smear1_ttm4, smear2_ttm4, smear3_ttm4)
 end
