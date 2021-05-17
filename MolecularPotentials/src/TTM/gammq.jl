@@ -110,6 +110,10 @@ let
     end
 
     function gammq(a::Float64, x::Float64)
+        """
+        Implements the q-gamma function which seemingly isn't available
+        in SpecialFunctions.jl.
+        """
         ASWITCH::Int = 100
 
         @assert (x >= 0.0 && a > 0.0) "Negative numbers are not valid for gamma function!"
