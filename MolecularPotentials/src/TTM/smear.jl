@@ -1,6 +1,18 @@
 include("smearing_functions.jl")
 abstract type Smear end
 
+function get_smear_type(potential::Symbol)
+    if potential == :ttm3
+        return Smear_TTM3()
+    elseif potential == :ttm21
+        return Smear_TTM21()
+    elseif potential == :ttm4
+        return Smear_TTM4()
+    else
+        @assert false "Didn't receive a valid potential. Pass as a symbol :ttm3, :ttm21, or :ttm4."
+    end
+end
+
 struct Smear_TTM3 <: Smear
     aCC::Float64
     aCD::Float64

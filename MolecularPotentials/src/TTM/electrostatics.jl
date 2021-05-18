@@ -4,24 +4,28 @@ include("smear.jl")
 
 mutable struct Electrostatics
     natom::Int
-    q::Vector{Float64} # natom
-    dipoles::Vector{Float64} # 3*natom
-    damping_fac::Vector{Float64} # natom
-    α::Vector{Float64} # natom
-    α_sqrt::Vector{Float64} # 3*natoms
-    ϕ::Vector{Float64} # natom
-    E_field_q::Vector{MVector{3, Float64}} # 3*natom elements
-    E_field_dip::Vector{MVector{3, Float64}} # 3*natom elements
+    q::Vector{Float64} # 4 * nW
+    dipoles::Vector{Float64} # 3 * natom
+    damping_fac::Vector{Float64} # 4 * nW
+    α::Vector{Float64} # 4 * nW
+    ϕ::Vector{Float64} # natom ?
+    E_field_q::Vector{MVector{3, Float64}} # 3 * natom elements
+    E_field_dip::Vector{MVector{3, Float64}} # 3 * natom elements
     dip_dip_tensor::Vector{Float64} # natom * natom * 9 tensor 
     smear::Smear # smearing method
     dipoles_converged::Bool # convergence option
 end
 
+Electrostatics(charges::Vector{Float64}, C::TTM_Constants) =
+Electrostatics(length(charges), charges, zeros(3 * length(charges)), repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
+repeat([C.α_O, C.α_H, C.α_H, C.α_M], length(charges)), zeros(length(charges)), [@MVector zeros(3) for _ in 1:length(charges)],
+[@MVector zeros(3) for _ in 1:length(charges)], zeros(3 * 3 * length(charges)), get_smear_type(C.name), false)
+
 function get_α_sqrt(α::Vector{Float64})
-    α_sqrt = zeros(3 * length(α))
+    α_sqrt = zeros(4 * length(α))
     for i in 1:length(α)
-        for j in 1:3
-            α_sqrt[3*(i-1)+j] = sqrt(α[i])
+        for j in 1:4
+            α_sqrt[4*(i-1)+j] = sqrt(α[i])
         end
     end
 end
@@ -36,7 +40,7 @@ function ij_bonded(i::Int, j::Int)
 end
 
 function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing)
-    elec_data.α_sqrt = get_α_sqrt(elec_data.α)
+    α_sqrt = get_α_sqrt(elec_data.α)
 
     # should be possible to wrap in @distributed or @Threads.threads()
     for i in 1:(elec_data.natom-1)
@@ -57,6 +61,9 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
                 end
             end
 
+            # HERE!
+            println(E[i][:])
+
             # dipole-dipole tensor
             aDD::Float64 = ij_bonded(i, j) ? elec_data.smear.aDD_intramolecular : elec_data.smear.aDD_intermolecular
 
@@ -74,7 +81,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
             dd3[3][1] = dd3[1][3]
             dd3[3][2] = dd3[2][3]
 
-            aiaj::Float64 = elec_data.α_sqrt[i] * elec_data.α_sqrt[j]
+            aiaj::Float64 = α_sqrt[i] * α_sqrt[j]
             for k in 1:3
                 for l in 1:3
                     elec_data.dip_dip_tensor[k][l] = -aiaj * dd3[k][l]
@@ -114,7 +121,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
 
     # solve L*y = sqrt(a)*Efq storing y in dipole[]
     for i in 1:natom3
-        sum__::Float64 = elec_data.α_sqrt[i] * elec_data.E_field_q[i]
+        sum__::Float64 = α_sqrt[i] * elec_data.E_field_q[i]
         for k in 1:i
             sum__ -= elec_data.dip_dip_tensor[i*natom3 + k] * elec_data.dipole[k]
         end
