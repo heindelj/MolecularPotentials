@@ -1,4 +1,5 @@
 using StaticArrays
+using LinearAlgebra
 include("constants.jl")
 include("smear.jl")
 
@@ -19,7 +20,7 @@ end
 Electrostatics(charges::Vector{Float64}, C::TTM_Constants) =
 Electrostatics(length(charges), charges, zeros(3 * length(charges)), repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
 repeat([C.α_O, C.α_H, C.α_H, C.α_M], length(charges)), zeros(length(charges)), [@MVector zeros(3) for _ in 1:length(charges)],
-[@MVector zeros(3) for _ in 1:length(charges)], zeros(3 * 3 * length(charges)), get_smear_type(C.name), false)
+[@MVector zeros(3) for _ in 1:length(charges)], zeros(3 * 3 * length(charges) * length(charges)), get_smear_type(C.name), false)
 
 function get_α_sqrt(α::Vector{Float64})
     α_sqrt = zeros(4 * length(α))
@@ -28,15 +29,16 @@ function get_α_sqrt(α::Vector{Float64})
             α_sqrt[4*(i-1)+j] = sqrt(α[i])
         end
     end
+    return α_sqrt
 end
 
 function ij_bonded(i::Int, j::Int)
     """
     Determine if i and j are a part of the same water.
-    Since everything has to be in OHH order, we can just infer from the indices.
+    Since everything has to be in OHHM order, we can just infer from the indices.
     Note that this won't check if your input is valid (all indices should be >= 1).
     """
-    return (i-1) ÷ 3 == (j-1) ÷ 3
+    return (i-1) ÷ 4 == (j-1) ÷ 4
 end
 
 function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing)
@@ -44,7 +46,9 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
 
     # should be possible to wrap in @distributed or @Threads.threads()
     for i in 1:(elec_data.natom-1)
+        i3::Int = 3 * (i - 1)
         for j in (i+1):elec_data.natom
+            j3::Int = 3 * (j - 1)
             @views r_ij::Vector{Float64} = coords[:, i] - coords[:, j]
             r_ij_sq::Float64 = r_ij ⋅ r_ij
 
@@ -56,13 +60,12 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
                 elec_data.ϕ[j] += ts0 * elec_data.q[i]
 
                 for k in 1:3
-                    elec_data.E_field_q[i][k] += ts1 * charge[j] * r_ij[k]
-                    elec_data.E_field_q[j][k] -= ts1 * charge[i] * r_ij[k]
+                    elec_data.E_field_q[i][k] += ts1 * elec_data.q[j] * r_ij[k]
+                    elec_data.E_field_q[j][k] -= ts1 * elec_data.q[i] * r_ij[k]
                 end
             end
 
-            # HERE!
-            println(E[i][:])
+            println(elec_data.E_field_q[j][:])
 
             # dipole-dipole tensor
             aDD::Float64 = ij_bonded(i, j) ? elec_data.smear.aDD_intramolecular : elec_data.smear.aDD_intermolecular
@@ -71,20 +74,20 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
 
             dd3 = @MMatrix zeros(3, 3)
 
-            dd3[1][1] = 3.0 * ts2 * r_ij[1] * r_ij[1] - ts1
-            dd3[2][2] = 3.0 * ts2 * r_ij[2] * r_ij[2] - ts1
-            dd3[3][3] = 3.0 * ts2 * r_ij[3] * r_ij[3] - ts1
-            dd3[1][2] = 3.0 * ts2 * r_ij[1] * r_ij[2]
-            dd3[1][3] = 3.0 * ts2 * r_ij[1] * r_ij[3]
-            dd3[2][3] = 3.0 * ts2 * r_ij[2] * r_ij[3]
-            dd3[2][1] = dd3[1][2]
-            dd3[3][1] = dd3[1][3]
-            dd3[3][2] = dd3[2][3]
+            dd3[1, 1] = 3.0 * ts2 * r_ij[1] * r_ij[1] - ts1
+            dd3[2, 2] = 3.0 * ts2 * r_ij[2] * r_ij[2] - ts1
+            dd3[3, 3] = 3.0 * ts2 * r_ij[3] * r_ij[3] - ts1
+            dd3[1, 2] = 3.0 * ts2 * r_ij[1] * r_ij[2]
+            dd3[1, 3] = 3.0 * ts2 * r_ij[1] * r_ij[3]
+            dd3[2, 3] = 3.0 * ts2 * r_ij[2] * r_ij[3]
+            dd3[2, 1] = dd3[1, 2]
+            dd3[3, 1] = dd3[1, 3]
+            dd3[3, 2] = dd3[2, 3]
 
             aiaj::Float64 = α_sqrt[i] * α_sqrt[j]
             for k in 1:3
                 for l in 1:3
-                    elec_data.dip_dip_tensor[k][l] = -aiaj * dd3[k][l]
+                    elec_data.dip_dip_tensor[3 * elec_data.natom * (i3 + k) + j3 + l] = -aiaj * dd3[k, l]
                 end
             end
         end
@@ -95,7 +98,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
 
     # populate the diagonal
     for i in 1:(3 * elec_data.natom)
-        elec_data.dip_dip_tensor[3*natom*(i-1) + i] = 1.0
+        elec_data.dip_dip_tensor[3 * elec_data.natom*(i-1) + i] = 1.0
     end
 
     # perform Cholesky decomposition ddt = L*L^T
@@ -110,8 +113,8 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
             for k in 1:i
                 sum__ -= elec_data.dip_dip_tensor[i*natom3 + k] * elec_data.dip_dip_tensor[j*natom3 + k]
             end
-            if i == j 
-                @assert sum__ > 0.0 "Sum is not greater than zero."
+            if i == j
+                @assert sum__ >= 0.0 "Sum is not greater than zero."
                 elec_data.E_field_dip[i] = sqrt(sum__)
             else
                 elec_data.dip_dip_tensor[j*natom3 + i] = sum__ / elec_data.E_field_dip[i]
