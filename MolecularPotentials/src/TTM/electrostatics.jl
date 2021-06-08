@@ -128,23 +128,22 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         for k in 1:i
             sum__ -= elec_data.dip_dip_tensor[i*natom3 + k] * elec_data.dipoles[k]
         end
-
         elec_data.dipoles[i+1] = sum__ / elec_data.E_field_dip[i+1]
         xyz == 3 ? xyz = 1 : xyz += 1 
     end
 
     # solve L^T*x = y
-    for i in natom3:-1:1
+    for i in natom3+1:-1:2
         i1::Int = i - 1
         sum__::Float64 = elec_data.dipoles[i1]
         for k in i:natom3
-            sum__ -= elec_data.dip_dip_tensor[k*natom3 + i1] * elec_data.dipole[k]
+            sum__ -= elec_data.dip_dip_tensor[(k-1)*natom3 + i1] * elec_data.dipoles[k]
         end
-        elec_data.dipole[i1] = sum__ / elec_data.E_field_dip[i1]
+        elec_data.dipoles[i1] = sum__ / elec_data.E_field_dip[i1]
     end
 
     for i in 1:natom3
-        elec_data.dipole[i] *= polar_sqrt[i]
+        elec_data.dipoles[i] *= α_sqrt[i]
     end
 
     elec_data.dipoles_converged = true
@@ -154,10 +153,10 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         E_elec += elec_data.ϕ[i] * elec_data.q[i]
     end
     E_elec *= 0.5
-
+    
     E_ind::Float64 = 0.0
     for i in 1:3*elec_data.natom
-        E_ind -= elec_data.dipole[i] * elec_data.E_field_q[i]
+        E_ind -= elec_data.dipoles[i] * elec_data.E_field_q[(i+2) ÷ 3][((i-1) % 3)+1]
     end
     E_ind *= 0.5
 
@@ -166,6 +165,83 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         return E_elec + E_ind
     end
 
-    # do the gradients
+    ### CALCULATE THE GRADIENTS ###
+    # CHECK THE GRADIENTS WORK!!!
+    # charge-charge interactions
+    for i in 1:elec_data.natom
+        for k in 1:3
+            grads[k, i] = -elec_data.q[i] * elec_data.E_field_q[i][k]
+        end
+    end
+    # charge-dipole interactions
+    for i in 1:elec_data.natom
+        i3::Int = 3 * (i - 1)
+        for j in 1:elec_data.natom
+            j3::Int = 3 * j
+            qj::Float64 = elec_data.q[j]
 
+            # check this!!
+            skip_ij = ij_bonded(i, j)
+
+            if (skip_ij)
+                continue # skip this (i, j) pair
+
+            Rij = zeros(3)
+            Rsq::Float64 = 0.0
+            diR::Float64 = 0.0
+            for k in 1:3
+                Rij[k] = coords[k, i] - coords[k, j]
+                Rsq += Rij[k] * Rij[k]
+                diR += elec_data.dipoles[i3 + k] * Rij[k]
+            end
+
+            ts1, ts2 = elec_data.smear.smear2(Rsq, elec_data.α[i] * elec_data.α[j], elec_data.smear.aCD);
+
+            for k in 1:3
+                derij::Float64 = qj * (3 * ts2 * diR * Rij[k] - ts1 * elec_data.dipoles[i3 + k])
+
+                grads[k, i] += derij
+                grads[k, j] -= derij
+            end
+
+            elec_data.ϕ[j] -= ts1 * diR
+        end
+    end
+
+    # dipole-dipole interactions
+    for i in 1:elec_data.natom-1
+        i3::Int = 3 * (i - 1)
+        for j in i+1:elec_data.natom
+            j3::Int = 3 * (j - 1)
+
+            Rij = zeros(3)
+            Rsq::Float64  = 0.0
+            diR::Float64  = 0.0
+            diR::Float64  = 0.0
+            didj::Float64 = 0.0
+            for k in 1:3
+                Rij[k] = coords[k, i] - coords[k, j]
+                Rsq  += Rij[k] * Rij[k]
+                diR  += elec_data.dipoles[i3 + k] * Rij[k]
+                djR  += elec_data.dipoles[j3 + k] * Rij[k]
+                didj += elec_data.dipoles[i3 + k] * elec_data.dipoles[j3 + k]
+            end
+
+            aDD = ij_bonded(i, j) ? elec_data.smear.aDD_intramolecular : elec_data.smear.aDD_intermolecular
+
+            ts1, ts2, ts3 = elec_data.smear.smear3(Rsq, elec_data.α[i] * elec_data.α[j], aDD, ts1, ts2, ts3);
+
+            for k in 1:3
+                derij::Float64 = - 3 * ts2 * (didj * Rij[k] 
+                + djR * elec_data.dipoles[i3 + k]
+                + diR * elec_data.dipoles[j3 + k])
+                + 15 * ts3 * diR * djR * Rij[k]
+
+                grads[k, i] += derij
+                grads[k, j] -= derij
+            end
+
+        end
+    end
+    return E_elec + E_ind
 end
