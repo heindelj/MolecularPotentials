@@ -57,7 +57,7 @@ function smear3_ttm3(drsq::Float64, α_12::Float64, a::Float64)
 
         ts1::Float64 = (1.0 - exp1)*dri*drsqi
         ts2::Float64 = (ts1 - exp1*a/(AA^3))*drsqi
-        ts3::Float64 = (ts2 - 0.6*exp1*dd*a*a/pol12)*drsqi
+        ts3::Float64 = (ts2 - 0.6*exp1*dd*a*a/α_12)*drsqi
         return ts1, ts2, ts3
     end 
     ts1 = dri * drsqi

@@ -45,6 +45,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
     α_sqrt = get_α_sqrt(elec_data.α)
 
     # should be possible to wrap in @distributed or @Threads.threads()
+    dd3 = @MMatrix zeros(3, 3)
     for i in 1:(elec_data.natom-1)
         i3::Int = 3 * (i - 1) + 1
         for j in (i+1):elec_data.natom
@@ -69,7 +70,6 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
             aDD::Float64 = ij_bonded(i, j) ? elec_data.smear.aDD_intramolecular : elec_data.smear.aDD_intermolecular
 
             ts1, ts2 = elec_data.smear.smear2(r_ij_sq, elec_data.damping_fac[i] * elec_data.damping_fac[j], aDD)
-            dd3 = @MMatrix zeros(3, 3)
 
             dd3[1, 1] = 3.0 * ts2 * r_ij[1] * r_ij[1] - ts1
             dd3[2, 2] = 3.0 * ts2 * r_ij[2] * r_ij[2] - ts1
@@ -113,7 +113,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
                 end
             end
             if i == j
-                @assert sum__ > 0.0 "Sum is not greater than zero."
+                #@assert sum__ > 0.0 "Sum is not greater than zero."
                 elec_data.E_field_dip[i+1] = sqrt(sum__)
             else
                 elec_data.dip_dip_tensor[j*natom3 + i + 1] = sum__ / elec_data.E_field_dip[i+1]
@@ -166,18 +166,20 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
     end
 
     ### CALCULATE THE GRADIENTS ###
-    # CHECK THE GRADIENTS WORK!!!
     # charge-charge interactions
     for i in 1:elec_data.natom
         for k in 1:3
             grads[k, i] = -elec_data.q[i] * elec_data.E_field_q[i][k]
         end
     end
+    
     # charge-dipole interactions
+    Rij = zeros(3)
+    Rsq::Float64 = 0.0
+    derij::Float64 = 0.0
     for i in 1:elec_data.natom
         i3::Int = 3 * (i - 1)
         for j in 1:elec_data.natom
-            j3::Int = 3 * j
             qj::Float64 = elec_data.q[j]
 
             # check this!!
@@ -185,20 +187,19 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
 
             if (skip_ij)
                 continue # skip this (i, j) pair
+            end
 
-            Rij = zeros(3)
-            Rsq::Float64 = 0.0
             diR::Float64 = 0.0
             for k in 1:3
                 Rij[k] = coords[k, i] - coords[k, j]
-                Rsq += Rij[k] * Rij[k]
                 diR += elec_data.dipoles[i3 + k] * Rij[k]
             end
+            Rsq = Rij ⋅ Rij
 
-            ts1, ts2 = elec_data.smear.smear2(Rsq, elec_data.α[i] * elec_data.α[j], elec_data.smear.aCD);
+            ts1, ts2 = elec_data.smear.smear2(Rsq, elec_data.damping_fac[i] * elec_data.damping_fac[j], elec_data.smear.aCD);
 
             for k in 1:3
-                derij::Float64 = qj * (3 * ts2 * diR * Rij[k] - ts1 * elec_data.dipoles[i3 + k])
+                derij = qj * (3 * ts2 * diR * Rij[k] - ts1 * elec_data.dipoles[i3 + k])
 
                 grads[k, i] += derij
                 grads[k, j] -= derij
@@ -213,35 +214,30 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         i3::Int = 3 * (i - 1)
         for j in i+1:elec_data.natom
             j3::Int = 3 * (j - 1)
-
-            Rij = zeros(3)
-            Rsq::Float64  = 0.0
-            diR::Float64  = 0.0
-            diR::Float64  = 0.0
-            didj::Float64 = 0.0
+            
+            diR::Float64 = 0.0
+            djR:: Float64  = 0.0
+            didj::Float64  = 0.0
             for k in 1:3
                 Rij[k] = coords[k, i] - coords[k, j]
-                Rsq  += Rij[k] * Rij[k]
                 diR  += elec_data.dipoles[i3 + k] * Rij[k]
                 djR  += elec_data.dipoles[j3 + k] * Rij[k]
                 didj += elec_data.dipoles[i3 + k] * elec_data.dipoles[j3 + k]
             end
+            Rsq  = Rij ⋅ Rij
 
             aDD = ij_bonded(i, j) ? elec_data.smear.aDD_intramolecular : elec_data.smear.aDD_intermolecular
 
-            ts1, ts2, ts3 = elec_data.smear.smear3(Rsq, elec_data.α[i] * elec_data.α[j], aDD, ts1, ts2, ts3);
-
+            ts1, ts2, ts3 = elec_data.smear.smear3(Rsq, elec_data.damping_fac[i] * elec_data.damping_fac[j], aDD)
+            
             for k in 1:3
-                derij::Float64 = - 3 * ts2 * (didj * Rij[k] 
-                + djR * elec_data.dipoles[i3 + k]
-                + diR * elec_data.dipoles[j3 + k])
-                + 15 * ts3 * diR * djR * Rij[k]
-
+                derij = - 3 * ts2 * (didj * Rij[k] + djR * elec_data.dipoles[i3 + k] + diR * elec_data.dipoles[j3 + k]) + 15 * ts3 * diR * djR * Rij[k]
                 grads[k, i] += derij
                 grads[k, j] -= derij
             end
 
         end
     end
+ 
     return E_elec + E_ind
 end
