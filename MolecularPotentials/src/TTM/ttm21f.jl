@@ -1,4 +1,13 @@
+include("electrostatics.jl")
+include("Partridge_Schwenke.jl")
 
+struct TTM21F
+    num_waters::Int
+    constants::TTM21_Constants
+    elec_data::Electrostatics
+end
+
+TTM21F(num_waters::Int) = TTM21F(num_waters, TTM21_Constants(), Electrostatics(zeros(Int(num_waters * 4 / 3)), TTM21_Constants())
 
 function compute_M_site_crd(coords::Matrix{Float64}, γ_1::Float64, γ_2::Float64)
     """
@@ -18,4 +27,12 @@ function compute_M_site_crd(coords::Matrix{Float64}, γ_1::Float64, γ_2::Float6
         end
     end
     return new_coords
+end
+
+function get_energy(ttm21f::TTM21F, coords::Matrix{Float64})
+    """
+    Evaluates the ttm21f energy of the system containing water called coords.
+    """
+    coords_with_M = compute_M_site_crd(coords, ttm21f.constants.γ_1, ttm21f.constants.γ_2)
+    # HERE! #
 end

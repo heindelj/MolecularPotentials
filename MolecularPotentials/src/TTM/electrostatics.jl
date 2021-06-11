@@ -9,7 +9,7 @@ mutable struct Electrostatics
     dipoles::Vector{Float64} # 3 * natom
     damping_fac::Vector{Float64} # 4 * nW
     α::Vector{Float64} # 4 * nW
-    ϕ::Vector{Float64} # natom ?
+    ϕ::Vector{Float64} # natom 
     E_field_q::Vector{MVector{3, Float64}} # 3 * natom elements
     E_field_dip::Vector{Float64} # 3 * natom elements
     dip_dip_tensor::Vector{Float64} # natom * natom * 9 tensor 
@@ -21,6 +21,15 @@ Electrostatics(charges::Vector{Float64}, C::TTM_Constants) =
 Electrostatics(length(charges), charges, zeros(3 * length(charges)), repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
 repeat([C.α_O, C.α_H, C.α_H, C.α_M], length(charges)), zeros(length(charges)), [@MVector zeros(3) for _ in 1:length(charges)],
 zeros(3 * length(charges)), zeros(3 * 3 * length(charges) * length(charges)), get_smear_type(C.name), false)
+
+function reset_electostatics!(elec_data::Electrostatics)
+    """
+    Resets the electrostatics struct so as to not have problems repeating the calculations
+    with the same container.
+    """
+    elec_data.ϕ -= elec_data.ϕ
+    elec_data.E_field_q -= elec_data.E_field_q
+end 
 
 function get_α_sqrt(α::Vector{Float64})
     α_sqrt = zeros(4 * length(α))
@@ -42,6 +51,7 @@ function ij_bonded(i::Int, j::Int)
 end
 
 function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing)
+    reset_electostatics!(elec_data)
     α_sqrt = get_α_sqrt(elec_data.α)
 
     # should be possible to wrap in @distributed or @Threads.threads()
