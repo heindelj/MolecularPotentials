@@ -483,7 +483,7 @@ let # scope all the constants we need for this potential
 
     C = PS_Constants # just an alias for convenience
 
-    function pot_nasa(coords::SMatrix{3, 3, Float64}, grads::Union{MMatrix{3, 3, Float64}, Nothing}=nothing)
+    function pot_nasa(coords::SMatrix{3, 3, Float64}, grads::Union{AbstractMatrix{Float64}, Nothing}=nothing)
         rOH1::SVector{3, Float64} = coords[:, 1] - coords[:, 2]
         rOH2::SVector{3, Float64} = coords[:, 1] - coords[:, 3]
         rHH ::SVector{3, Float64} = coords[:, 2] - coords[:, 3]
@@ -543,7 +543,7 @@ let # scope all the constants we need for this potential
         energy::Float64 = Va + Vb + Vc;
 
         energy += 0.44739574026257 # correction
-        energy *= conversion(:wavenumbers, :hartree)
+        energy *= conversion(:wavenumbers, :kcal)
         if grads !== nothing
             dVcdr1::Float64 = (-2 * C.b1 * efac * (norm(rOH1) - C.reoh) * sum0 + efac * sum1 / C.reoh) / norm(rOH1)
 
@@ -557,7 +557,7 @@ let # scope all the constants we need for this potential
             @views grads[:, 3] = dVa2 * rOH2 - dVb * rHH + dVcdr2 * rOH2 + dVcdcth * (rOH1 / (norm(rOH1) * norm(rOH2)) - cosθ * rOH2 / (norm(rOH2) * norm(rOH2)))
             # O
             @views grads[:, 1] = -(grads[:, 2] + grads[:, 3])
-            grads .*= -conversion(:wavenumbers, :hartree) # also converts from forces to gradients
+            grads .*= -conversion(:wavenumbers, :kcal) # also converts from forces to gradients
             return energy
         end
     
@@ -753,7 +753,6 @@ let # scope all the constants we need for this potential
         q_derivative[1, 3, 3] = -(q_derivative[1, 1, 3] + q_derivative[1, 2, 3])
         q_derivative[2, 3, 3] = -(q_derivative[2, 1, 3] + q_derivative[2, 2, 3])
         q_derivative[3, 3, 3] = -(q_derivative[3, 1, 3] + q_derivative[3, 2, 3])
-        
         # for some reason I'm off by a minus sign compared to reference so multiply by -1...
         @views q_derivative[:, :, :] *= -1
         return
