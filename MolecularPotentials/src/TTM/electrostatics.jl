@@ -50,7 +50,7 @@ function ij_bonded(i::Int, j::Int)
     return (i-1) ÷ 4 == (j-1) ÷ 4
 end
 
-function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing)
+function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Float64}}, grads::Union{Matrix{Float64}, Nothing}=nothing)
     reset_electostatics!(elec_data)
     α_sqrt = get_α_sqrt(elec_data.α)
 
@@ -60,7 +60,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         i3::Int = 3 * (i - 1) + 1
         for j in (i+1):elec_data.natom
             j3::Int = 3 * (j - 1) + 1
-            @views r_ij::Vector{Float64} = coords[:, i] - coords[:, j]
+            @views r_ij::Vector{Float64} = coords[i] - coords[j]
             r_ij_sq::Float64 = r_ij ⋅ r_ij
 
             # charge-charge
@@ -123,7 +123,6 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
                 end
             end
             if i == j
-                #@assert sum__ > 0.0 "Sum is not greater than zero."
                 elec_data.E_field_dip[i+1] = sqrt(sum__)
             else
                 elec_data.dip_dip_tensor[j*natom3 + i + 1] = sum__ / elec_data.E_field_dip[i+1]
@@ -131,7 +130,7 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         end
     end
 
-    # solve L*y = sqrt(a)*Efq storing y in dipole[]
+    # solve L*y = sqrt(a)*Efq storing y in dipoles
     xyz::Int = 1
     for i in 0:natom3-1
         sum__::Float64 = α_sqrt[i+1] * elec_data.E_field_q[(i ÷ 3) + 1][xyz]
@@ -192,7 +191,6 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
         for j in 1:elec_data.natom
             qj::Float64 = elec_data.q[j]
 
-            # check this!!
             skip_ij = ij_bonded(i, j)
 
             if (skip_ij)
@@ -200,8 +198,8 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
             end
 
             diR::Float64 = 0.0
+            Rij = coords[i] - coords[j]
             for k in 1:3
-                Rij[k] = coords[k, i] - coords[k, j]
                 diR += elec_data.dipoles[i3 + k] * Rij[k]
             end
             Rsq = Rij ⋅ Rij
@@ -228,8 +226,8 @@ function electrostatics(elec_data::Electrostatics, coords::Matrix{Float64}, grad
             diR::Float64 = 0.0
             djR:: Float64  = 0.0
             didj::Float64  = 0.0
+            Rij = coords[i] - coords[j]
             for k in 1:3
-                Rij[k] = coords[k, i] - coords[k, j]
                 diR  += elec_data.dipoles[i3 + k] * Rij[k]
                 djR  += elec_data.dipoles[j3 + k] * Rij[k]
                 didj += elec_data.dipoles[i3 + k] * elec_data.dipoles[j3 + k]
