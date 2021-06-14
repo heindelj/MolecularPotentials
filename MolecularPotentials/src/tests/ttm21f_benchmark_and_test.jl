@@ -12,3 +12,5 @@ correct_energy = -215.22312443016003
 correct_grads  = readdlm("/home/heindelj/OneDrive/Documents/Coding_Projects/julia_development/MolecularPotentials/MolecularPotentials/src/tests/w20_grads_correct.txt", Float64)
 Test.@test energy ≈ correct_energy
 Test.@test grads  ≈ correct_grads
+println(energy)
+#display(grads)
