@@ -11,7 +11,7 @@ mutable struct Electrostatics
     α::Vector{Float64} # 4 * nW
     ϕ::Vector{Float64} # natom 
     E_field_q::Vector{MVector{3, Float64}} # 3 * natom elements
-    E_field_dip::Vector{Float64} # 3 * natom elements
+    E_field_dip::Vector{MVector{3, Float64}} # 3 * natom elements
     dip_dip_tensor::Vector{Float64} # natom * natom * 9 tensor 
     previous_dipoles::Vector{MVector{3, Float64}} # 3 * natom
     smear::Smear # smearing method
@@ -21,7 +21,7 @@ end
 Electrostatics(charges::Vector{Float64}, C::TTM_Constants) =
 Electrostatics(length(charges), charges, [@MVector zeros(3) for _ in  1:length(charges)], repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
 repeat([C.α_O, C.α_H, C.α_H, C.α_M], length(charges)), zeros(length(charges)), [@MVector zeros(3) for _ in 1:length(charges)],
-zeros(3 * length(charges)), zeros(3 * 3 * length(charges) * length(charges)), [@MVector zeros(3) for _ in  1:length(charges)], get_smear_type(C.name), false)
+[@MVector zeros(3) for _ in 1:length(charges)], zeros(3 * 3 * length(charges) * length(charges)), [@MVector zeros(3) for _ in  1:length(charges)], get_smear_type(C.name), false)
 
 function reset_electrostatics!(elec_data::Electrostatics)
     """
