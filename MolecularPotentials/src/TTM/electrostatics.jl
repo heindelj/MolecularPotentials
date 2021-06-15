@@ -6,21 +6,22 @@ include("smear.jl")
 mutable struct Electrostatics
     natom::Int
     q::Vector{Float64} # 4 * nW
-    dipoles::Vector{Float64} # 3 * natom
+    dipoles::Vector{MVector{3, Float64}} # 3 * natom
     damping_fac::Vector{Float64} # 4 * nW
     α::Vector{Float64} # 4 * nW
     ϕ::Vector{Float64} # natom 
     E_field_q::Vector{MVector{3, Float64}} # 3 * natom elements
     E_field_dip::Vector{Float64} # 3 * natom elements
     dip_dip_tensor::Vector{Float64} # natom * natom * 9 tensor 
+    previous_dipoles::Vector{MVector{3, Float64}} # 3 * natom
     smear::Smear # smearing method
     dipoles_converged::Bool # convergence option
 end
 
 Electrostatics(charges::Vector{Float64}, C::TTM_Constants) =
-Electrostatics(length(charges), charges, zeros(3 * length(charges)), repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
+Electrostatics(length(charges), charges, [@MVector zeros(3) for _ in  1:length(charges)], repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
 repeat([C.α_O, C.α_H, C.α_H, C.α_M], length(charges)), zeros(length(charges)), [@MVector zeros(3) for _ in 1:length(charges)],
-zeros(3 * length(charges)), zeros(3 * 3 * length(charges) * length(charges)), get_smear_type(C.name), false)
+zeros(3 * length(charges)), zeros(3 * 3 * length(charges) * length(charges)), [@MVector zeros(3) for _ in  1:length(charges)], get_smear_type(C.name), false)
 
 function reset_electrostatics!(elec_data::Electrostatics)
     """
@@ -60,8 +61,6 @@ end
 function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Float64}}, grads_E::Union{Vector{MVector{3, Float64}}, Nothing}=nothing, use_cholesky::Bool=false)
     if use_cholesky
         α_sqrt = get_α_sqrt(elec_data.α)
-    else
-        previous_dipoles = zero(elec_data.dipoles)
     end
     reset_electrostatics!(elec_data)
 
@@ -121,6 +120,7 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
 
     # convert ddt into an actual tensor later on and figure out
     # how to use the library cholesky decomposition
+    # DIPOLES BROKEN IN CHOLESKY FOR NOW
     if use_cholesky
         # populate the diagonal
         for i in 1:(3 * elec_data.natom)
@@ -176,22 +176,21 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
     else
         # Calculate induced dipoles iteratively
         for i in 1:elec_data.natom
-            i3::Int = 3 * (i-1)
-            for k in 1:3
-                elec_data.dipoles[i3 + k] = elec_data.α[k] * elec_data.E_field_q[i][k]
-                previous_dipoles[i3 + k]  = elec_data.dipoles[i3 + k]
-            end
+            @inbounds elec_data.dipoles[i] = elec_data.α[1:3] .* elec_data.E_field_q[i]
+            @inbounds elec_data.previous_dipoles[i] = elec_data.α[1:3] .* elec_data.E_field_q[i]
         end
     
-        dmix::Float64 = 0.7
+        dmix::Float64 = 0.75
         stath::Float64 = DEBYE / CHARGECON / sqrt(elec_data.natom)
     
         elec_data.dipoles_converged = false
     
         for iter in 1:dipole_maxiter
+            xyz = 1
             for k in 1:3*elec_data.natom
                 for l in 1:3*elec_data.natom
-                    elec_data.E_field_dip[k] += elec_data.dip_dip_tensor[3 * elec_data.natom * (k - 1) + l] * elec_data.dipoles[l]
+                    @inbounds elec_data.E_field_dip[k] += elec_data.dip_dip_tensor[3 * elec_data.natom * (k - 1) + l] * elec_data.dipoles[(l-1)÷3+1][xyz]
+                    xyz == 3 ? xyz = 1 : xyz += 1 
                 end
             end
     
@@ -200,21 +199,20 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
             for i in 1:elec_data.natom
                 i3::Int = 3 * (i - 1)
                 for k in 1:3
-                    elec_data.dipoles[i3 + k] = elec_data.α[i] * (elec_data.E_field_q[i][k] + elec_data.E_field_dip[i3 + k])
-                    elec_data.dipoles[i3 + k] = dmix * elec_data.dipoles[i3 + k] + (1.0 - dmix) * previous_dipoles[i3 + k]
-        
-                    delta = elec_data.dipoles[i3 + k] - previous_dipoles[i3 + k]
-                    deltadip += delta * delta
+                    @inbounds elec_data.dipoles[i][k] = elec_data.α[i] * (elec_data.E_field_q[i][k] + elec_data.E_field_dip[i3 + k])
                 end
             end
+
+            @inbounds elec_data.dipoles = dmix * elec_data.dipoles + (1.0 - dmix) * elec_data.previous_dipoles
+            delta = sum(sum.(elec_data.dipoles - elec_data.previous_dipoles))
     
-            deltadip = sqrt(deltadip) * stath
+            deltadip = sqrt(delta^2) * stath
     
             if deltadip < dipole_tolerance
                 elec_data.dipoles_converged = true
                 break # converged!
             else
-                copy!(previous_dipoles, elec_data.dipoles)
+                copy!.(elec_data.previous_dipoles, elec_data.dipoles)
                 elec_data.E_field_dip -= elec_data.E_field_dip
             end
         end
@@ -227,8 +225,8 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
     E_elec *= 0.5
     
     E_ind::Float64 = 0.0
-    for i in 1:3*elec_data.natom
-        @inbounds E_ind -= elec_data.dipoles[i] * elec_data.E_field_q[(i+2) ÷ 3][((i-1) % 3)+1]
+    for i in 1:elec_data.natom
+        @inbounds E_ind -= elec_data.dipoles[i] ⋅ elec_data.E_field_q[i]
     end
     E_ind *= 0.5
 
@@ -244,32 +242,21 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
     end
     
     # charge-dipole interactions
-    derij::Float64 = 0.0
     for i in 1:elec_data.natom
-        i3::Int = 3 * (i - 1)
         for j in 1:elec_data.natom
-            @inbounds qj::Float64 = elec_data.q[j]
-
-            skip_ij = ij_bonded(i, j)
-
-            if (skip_ij)
+            if (ij_bonded(i, j))
                 continue # skip this (i, j) pair
             end
 
-            diR::Float64 = 0.0
             Rij = coords[i] - coords[j]
-            for k in 1:3
-               @inbounds diR += elec_data.dipoles[i3 + k] * Rij[k]
-            end
+            diR = elec_data.dipoles[i] ⋅ Rij
 
-            ts1, ts2 = elec_data.smear.smear2(Rij ⋅ Rij, elec_data.damping_fac[i] * elec_data.damping_fac[j], elec_data.smear.aCD);
+            @inbounds ts1, ts2 = elec_data.smear.smear2(Rij ⋅ Rij, elec_data.damping_fac[i] * elec_data.damping_fac[j], elec_data.smear.aCD);
 
-            for k in 1:3
-                @inbounds derij = qj * (3 * ts2 * diR * Rij[k] - ts1 * elec_data.dipoles[i3 + k])
-
-                @inbounds grads_E[i][k] += derij
-                @inbounds grads_E[j][k] -= derij
-            end
+            @inbounds derij = elec_data.q[j] * (3 * ts2 * diR * Rij - ts1 * elec_data.dipoles[i])
+            
+            @inbounds grads_E[i] += derij
+            @inbounds grads_E[j] -= derij
 
             elec_data.ϕ[j] -= ts1 * diR
         end
@@ -277,30 +264,19 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
 
     # dipole-dipole interactions
     for i in 1:elec_data.natom-1
-        i3::Int = 3 * (i - 1)
         for j in i+1:elec_data.natom
-            j3::Int = 3 * (j - 1)
-            
-            diR::Float64 = 0.0
-            djR:: Float64  = 0.0
-            didj::Float64  = 0.0
             Rij = coords[i] - coords[j]
-            for k in 1:3
-                diR  += elec_data.dipoles[i3 + k] * Rij[k]
-                djR  += elec_data.dipoles[j3 + k] * Rij[k]
-                didj += elec_data.dipoles[i3 + k] * elec_data.dipoles[j3 + k]
-            end
+            @inbounds diR  = elec_data.dipoles[i] ⋅ Rij
+            @inbounds djR  = elec_data.dipoles[j] ⋅ Rij
+            @inbounds didj = elec_data.dipoles[i] ⋅ elec_data.dipoles[j]
 
             aDD = ij_bonded(i, j) ? elec_data.smear.aDD_intramolecular : elec_data.smear.aDD_intermolecular
 
-            ts1, ts2, ts3 = elec_data.smear.smear3(Rij ⋅ Rij, elec_data.damping_fac[i] * elec_data.damping_fac[j], aDD)
+            _, ts2, ts3 = elec_data.smear.smear3(Rij ⋅ Rij, elec_data.damping_fac[i] * elec_data.damping_fac[j], aDD)
             
-            for k in 1:3
-                @inbounds derij = - 3 * ts2 * (didj * Rij[k] + djR * elec_data.dipoles[i3 + k] + diR * elec_data.dipoles[j3 + k]) + 15 * ts3 * diR * djR * Rij[k]
-                @inbounds grads_E[i][k] += derij
-                @inbounds grads_E[j][k] -= derij
-            end
-
+            @inbounds derij = - 3 * ts2 * (didj * Rij + djR * elec_data.dipoles[i] + diR * elec_data.dipoles[j]) + 15 * ts3 * diR * djR * Rij
+            @inbounds grads_E[i] += derij
+            @inbounds grads_E[j] -= derij
         end
     end
  

@@ -1,8 +1,8 @@
 using Parameters
 
 ####### convergence constants #######
-CHARGECON = 18.22261544733
-DEBYE = 1.0/2.081943416923e-01 # eÅ
+const global CHARGECON = 18.22261720426243437986 
+const global DEBYE = 4.8033324 # eÅ
 
 ####### convergence parameters #######
 const global dipole_tolerance = 1.0e-15
