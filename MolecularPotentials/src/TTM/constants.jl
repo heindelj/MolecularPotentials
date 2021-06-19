@@ -36,6 +36,37 @@ abstract type TTM_Constants end
     name::Symbol = :ttm21
 end
 
+@with_kw struct TTM22_Constants <: TTM_Constants
+    # vdw
+    vdwA::Float64 = -1.329565985e+6
+    vdwB::Float64 =  3.632560798e+5
+    vdwC::Float64 = -2.147141323e+3
+    vdwD::Float64 =  1.0e+13
+    vdwE::Float64 =  13.2
+    
+    # dms (start with the ttm3 modified dms)
+    dms_param1::Float64 = 0.5
+    dms_param2::Float64 = 0.9578
+    dms_param3::Float64 = 0.012
+
+    # M-site positioning
+    γ_M::Float64 = 0.426706882
+    γ_1::Float64 = 1.0 - γ_M
+    γ_2::Float64 = γ_M / 2
+
+    # polarizability
+    α_O::Float64 = 0.837
+    α_H::Float64 = 0.496
+    α_M::Float64 = 0.0
+
+    # Thole damping factors
+    damping_factor_O::Float64 = α_O
+    damping_factor_H::Float64 = α_H
+    damping_factor_M::Float64 = α_O
+
+    name::Symbol = :ttm22
+end
+
 @with_kw struct TTM3_Constants <: TTM_Constants
     # vdw
     vdwC::Float64 = -0.72298855E+03

@@ -1,5 +1,6 @@
 using StaticArrays
 using LinearAlgebra
+using LoopVectorization
 include("constants.jl")
 include("smear.jl")
 
@@ -17,6 +18,8 @@ mutable struct Electrostatics
     smear::Smear # smearing method
     dipoles_converged::Bool # convergence option
 end
+
+# Try using the @turbo macro in the ttm21f file to pre-compute all differences.
 
 Electrostatics(charges::Vector{Float64}, C::TTM_Constants) =
 Electrostatics(length(charges), charges, [@MVector zeros(3) for _ in  1:length(charges)], repeat([C.damping_factor_O, C.damping_factor_H, C.damping_factor_H, C.damping_factor_M], length(charges)),
@@ -174,11 +177,18 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
     
         elec_data.dipoles_converged = true
     else
+        # This seems to be a not much better guess than just
+        # starting from zeros. 
+        # Using the dipoles from last call to the potential is the best
+        # when one can be sure the dipoles are similar from call to call.
+        # Perhaps there should be "MD/MC Mode" to hint that the
+        # dipoles will be similar from call to call.
+
         # Calculate induced dipoles iteratively
-        for i in 1:elec_data.natom
-            @inbounds elec_data.dipoles[i] = elec_data.α[1:3] .* elec_data.E_field_q[i]
-            @inbounds elec_data.previous_dipoles[i] = elec_data.α[1:3] .* elec_data.E_field_q[i]
-        end
+        #for i in 1:elec_data.natom
+        #    @inbounds elec_data.dipoles[i] = elec_data.α[1:3] .* elec_data.E_field_q[i]
+        #    @inbounds elec_data.previous_dipoles[i] = elec_data.α[1:3] .* elec_data.E_field_q[i]
+        #end
     
         dmix::Float64 = 0.75
         stath::Float64 = DEBYE / CHARGECON / sqrt(elec_data.natom)
@@ -187,20 +197,19 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
     
         for iter in 1:dipole_maxiter
             xyz = 1
+            xyz_outer = 1
             for k in 1:3*elec_data.natom
                 for l in 1:3*elec_data.natom
-                    @inbounds elec_data.E_field_dip[k] += elec_data.dip_dip_tensor[3 * elec_data.natom * (k - 1) + l] * elec_data.dipoles[(l-1)÷3+1][xyz]
+                    @inbounds elec_data.E_field_dip[(k-1)÷3+1][(k+2)%3+1] += elec_data.dip_dip_tensor[3 * elec_data.natom * (k - 1) + l] * elec_data.dipoles[(l-1)÷3+1][(l+2)%3+1]
                     xyz == 3 ? xyz = 1 : xyz += 1 
                 end
+                xyz_outer == 3 ? xyz_outer = 1 : xyz_outer += 1 
             end
     
             deltadip::Float64 = 0.0
     
             for i in 1:elec_data.natom
-                i3::Int = 3 * (i - 1)
-                for k in 1:3
-                    @inbounds elec_data.dipoles[i][k] = elec_data.α[i] * (elec_data.E_field_q[i][k] + elec_data.E_field_dip[i3 + k])
-                end
+                @inbounds elec_data.dipoles[i] = elec_data.α[i] * (elec_data.E_field_q[i] + elec_data.E_field_dip[i])
             end
 
             @inbounds elec_data.dipoles = dmix * elec_data.dipoles + (1.0 - dmix) * elec_data.previous_dipoles
@@ -279,6 +288,6 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
             @inbounds grads_E[j] -= derij
         end
     end
- 
+
     return E_elec + E_ind
 end
