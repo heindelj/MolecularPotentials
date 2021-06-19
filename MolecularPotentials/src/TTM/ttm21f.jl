@@ -2,7 +2,7 @@ include("electrostatics.jl")
 include("Partridge_Schwenke.jl")
 include("utilities.jl")
 
-mutable struct TTM21F <: TTM
+mutable struct TTM21F <: TTM_Potential
     num_waters::Int
 
     M_site_coords::Vector{SVector{3, Float64}}
@@ -33,7 +33,7 @@ function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union
     grads_q = [@MArray zeros(3,3,3) for _ in 1:ttm21f.num_waters]
     # calculate the INTRA-molecular energy and Dipole Moment
     # Surface (Partridge-Schwenke)
-    E_int = PS_energies_and_gradients!(ttm21f, coords, grads_q, grads)
+    E_int = PS_energies_and_gradients!(ttm21f, coords, grads_q, grads, false)
     
     ttm21f.elec_data.q *= CHARGECON
     if grads !== nothing
@@ -79,41 +79,11 @@ function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union
 
     E_elec::Float64 = electrostatics(ttm21f.elec_data, ttm21f.M_site_coords, grads_E, use_cholesky)
 
-    # this will be relevant once I add in the iterative approach
-    # as an alternative to cholesky factorization
     #assert(m_electrostatics.dipoles_converged())
 
-    # add electrostatic derivatives
-    for n in 1:ttm21f.num_waters
-        # add O H H gradients from PS and electrostatics (which has M site)
-        for k in 1:3
-            @inbounds @views grads[:, 3 * (n-1) + k] += grads_E[4 * (n-1) + k]
-        end
-
-        # redistribute the M-site derivatives
-        @inbounds @views grads[:, 3 * (n-1) + 1] += (1.0 - ttm21f.constants.γ_M) * grads_E[4*(n-1) + 4] # O
-        @inbounds @views grads[:, 3 * (n-1) + 2] +=  0.5 * ttm21f.constants.γ_M  * grads_E[4*(n-1) + 4] # H
-        @inbounds @views grads[:, 3 * (n-1) + 3] +=  0.5 * ttm21f.constants.γ_M  * grads_E[4*(n-1) + 4] # H
-    end
-
-    # derivatives from the adjustable charges of the NASA's PES
-    for n in 1:ttm21f.num_waters
-        i_O  = 3 * (n-1) + 1
-        i_H1 = 3 * (n-1) + 2
-        i_H2 = 3 * (n-1) + 3
-
-        @inbounds grads[:, i_H1] += (grads_q[n][:, 1, 1]*ttm21f.elec_data.ϕ[4*(n-1) + 2]   # phi(h1)
-                         + grads_q[n][:, 2, 1]*ttm21f.elec_data.ϕ[4*(n-1) + 3]   # phi(h2)
-                         + grads_q[n][:, 3, 1]*ttm21f.elec_data.ϕ[4*(n-1) + 4])  # phi(M)
-
-        @inbounds grads[:, i_H2] += (grads_q[n][:, 1, 2]*ttm21f.elec_data.ϕ[4*(n-1) + 2]   # phi(h1)
-                         + grads_q[n][:, 2, 2]*ttm21f.elec_data.ϕ[4*(n-1) + 3]   # phi(h2)
-                         + grads_q[n][:, 3, 2]*ttm21f.elec_data.ϕ[4*(n-1) + 4])  # phi(M)
-
-        @inbounds grads[:, i_O]  += (grads_q[n][:, 1, 3]*ttm21f.elec_data.ϕ[4*(n-1) + 2]   # phi(h1)
-                         + grads_q[n][:, 2, 3]*ttm21f.elec_data.ϕ[4*(n-1) + 3]   # phi(h2)
-                         + grads_q[n][:, 3, 3]*ttm21f.elec_data.ϕ[4*(n-1) + 4])  # phi(M)
-    end
+    # this function call might be slowing things down.
+    # 
+    add_electrostatic_and_dms_derivatives!(ttm21f, grads, grads_E, grads_q)
 
     return E_int + E_vdw + E_elec
 end
