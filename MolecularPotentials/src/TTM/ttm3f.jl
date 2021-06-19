@@ -56,11 +56,11 @@ function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{M
             E_vdw += ttm3f.constants.vdwC / norm(Rij)^6 + expon
 
             if (grads !== nothing) 
-                tmp::Float64 = (-(6.0 * ttm3f.constants.vdwC / norm(Rij)^6) - ttm3f.constants.vdwE * expon / norm(Rij))
+                tmp::Float64 = (-(6.0 * ttm3f.constants.vdwC / norm(Rij)^6) / (Rij ⋅ Rij) - ttm3f.constants.vdwE * expon / norm(Rij))
 
                 # add forces to indices for the M site
-                @inbounds @views grads[:, 3*(i-1)+1] -= tmp * Rij
-                @inbounds @views grads[:, 3*(j-1)+1] += tmp * Rij
+                @inbounds @views grads[:, 3*(i-1)+1] += tmp * Rij
+                @inbounds @views grads[:, 3*(j-1)+1] -= tmp * Rij
             end
         end
     end
@@ -77,8 +77,6 @@ function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{M
     E_elec::Float64 = electrostatics(ttm3f.elec_data, ttm3f.M_site_coords, grads_E, use_cholesky)
  
     #assert(m_electrostatics.dipoles_converged())
-    # PHI IS THE PROBLEM WITH EXCESS GRADIENT ON OXYGEN CENTERS
-    display(ttm3f.elec_data.ϕ)
 
     # this function call might be slowing things down.
     # 

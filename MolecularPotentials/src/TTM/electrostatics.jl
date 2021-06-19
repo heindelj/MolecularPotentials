@@ -288,6 +288,5 @@ function electrostatics(elec_data::Electrostatics, coords::Vector{SVector{3, Flo
             @inbounds grads_E[j] -= derij
         end
     end
-
     return E_elec + E_ind
 end
