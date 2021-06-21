@@ -76,10 +76,6 @@ function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{M
 
     E_elec::Float64 = electrostatics(ttm3f.elec_data, ttm3f.M_site_coords, grads_E, true)
  
-    #assert(m_electrostatics.dipoles_converged())
-
-    # this function call might be slowing things down.
-    # 
     add_electrostatic_and_dms_derivatives!(ttm3f, grads, grads_E, grads_q)
 
     return E_int + E_vdw + E_elec
