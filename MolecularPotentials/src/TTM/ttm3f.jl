@@ -13,7 +13,7 @@ end
 TTM3F(num_waters::Int) = TTM3F(num_waters, [@SVector zeros(3) for _ in 1:(num_waters > 0 ? 4*num_waters : 1)], TTM3_Constants(), Electrostatics(zeros(Int(num_waters * 4)), TTM3_Constants()))
 TTM3F() = TTM3F(0)
 
-function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing, use_cholesky::Bool=false)
+function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing)
     """
     Evaluates the ttm3f energy of the system containing water called coords.
     """
@@ -27,7 +27,7 @@ function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{M
 
     compute_M_site_crd!(ttm3f, coords)
     #Rij_vectors = distance_vectors(M_site_coords)
-    # @SPEED factor all of the gradient intermediates into a different function or block
+    # @SPEED Ignore all non M-Site calculations in the electrostatics calculation !!!!!
     # which is only executed if the gradients are actually requested
     grads_E = [@MVector zeros(3) for _ in 1:3 * 4 * ttm3f.num_waters] # O H H M
     grads_q = [@MArray zeros(3,3,3) for _ in 1:ttm3f.num_waters]
@@ -67,14 +67,14 @@ function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{M
     
     # if no gradients then just return energy here.
     if (grads === nothing)
-        return E_int + E_vdw + electrostatics(ttm3f.elec_data, ttm3f.M_site_coords, nothing, use_cholesky)
+        return E_int + E_vdw + electrostatics(ttm3f.elec_data, ttm3f.M_site_coords, nothing, true)
     end
 
     #-------------------------------------------------------------------------!
     # Calculate the remaining part of the derivatives                         !
     #-------------------------------------------------------------------------!
 
-    E_elec::Float64 = electrostatics(ttm3f.elec_data, ttm3f.M_site_coords, grads_E, use_cholesky)
+    E_elec::Float64 = electrostatics(ttm3f.elec_data, ttm3f.M_site_coords, grads_E, true)
  
     #assert(m_electrostatics.dipoles_converged())
 

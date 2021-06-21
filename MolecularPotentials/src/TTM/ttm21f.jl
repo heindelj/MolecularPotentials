@@ -13,7 +13,7 @@ end
 TTM21F(num_waters::Int) = TTM21F(num_waters, [@SVector zeros(3) for _ in 1:(num_waters > 0 ? 4*num_waters : 1)], TTM21_Constants(), Electrostatics(zeros(Int(num_waters * 4)), TTM21_Constants()))
 TTM21F() = TTM21F(0)
 
-function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing, use_cholesky::Bool=false)
+function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union{Matrix{Float64}, Nothing}=nothing)
     """
     Evaluates the ttm21f energy of the system containing water called coords.
     """
@@ -70,14 +70,14 @@ function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union
     
     # if no gradients then just return energy here.
     if (grads === nothing)
-        return E_int + E_vdw + electrostatics(ttm21f.elec_data, ttm21f.M_site_coords, nothing, use_cholesky)
+        return E_int + E_vdw + electrostatics(ttm21f.elec_data, ttm21f.M_site_coords, nothing)
     end
 
     #-------------------------------------------------------------------------!
     # Calculate the remaining part of the derivatives                         !
     #-------------------------------------------------------------------------!
 
-    E_elec::Float64 = electrostatics(ttm21f.elec_data, ttm21f.M_site_coords, grads_E, use_cholesky)
+    E_elec::Float64 = electrostatics(ttm21f.elec_data, ttm21f.M_site_coords, grads_E)
 
     #assert(m_electrostatics.dipoles_converged())
 
