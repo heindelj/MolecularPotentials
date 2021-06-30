@@ -1,12 +1,13 @@
 using Parameters
 
 ####### convergence constants #######
-const global CHARGECON = 18.22261720426243437986 
-const global DEBYE = 4.8033324 # eÅ
+@inline function chargecon()
+    return 18.22261720426243437986
+end
 
-####### convergence parameters #######
-const global dipole_tolerance = 1.0e-15
-const global dipole_maxiter   = 5000
+@inline function debye()
+    return 4.8033324 # eÅ
+end
 
 abstract type TTM_Constants end
 
@@ -125,7 +126,7 @@ end
 
 # probably factor all of the qtip4pf stuff into it's own directory
 @with_kw struct qtip4pf_Constants
-    qM::Float64 = -1.1128 * CHARGECON
+    qM::Float64 = -1.1128 * chargecon()
     qH::Float64 = -qM/2
 
     rOHeq::Float64= 0.9419 # A

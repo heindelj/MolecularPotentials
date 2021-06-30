@@ -45,7 +45,7 @@ function get_dipoles(ttm::TTM_Potential)
             dipoles[:, i÷4+1] += ttm.elec_data.dipoles[i+3] # M
         end
     end
-    return dipoles / CHARGECON * DEBYE
+    return dipoles / chargecon() * debye()
 end
 
 function get_dipole_magnitudes(ttm::TTM_Potential)

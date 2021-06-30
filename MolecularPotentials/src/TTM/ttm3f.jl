@@ -35,9 +35,9 @@ function evaluate!(ttm3f::TTM3F, coords::AbstractMatrix{Float64}, grads::Union{M
     # Surface (Partridge-Schwenke)
     E_int = PS_energies_and_gradients!(ttm3f, coords, grads_q, grads, true)
     
-    ttm3f.elec_data.q *= CHARGECON
+    ttm3f.elec_data.q *= chargecon()
     if grads !== nothing
-        grads_q *= CHARGECON
+        grads_q *= chargecon()
     end
    
     #---------------------------------------------------------------!

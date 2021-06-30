@@ -35,9 +35,9 @@ function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union
     # Surface (Partridge-Schwenke)
     E_int = PS_energies_and_gradients!(ttm21f, coords, grads_q, grads, false)
     
-    ttm21f.elec_data.q *= CHARGECON
+    ttm21f.elec_data.q *= chargecon()
     if grads !== nothing
-        grads_q *= CHARGECON
+        grads_q *= chargecon()
     end
     
     #---------------------------------------------------------------!
@@ -78,8 +78,6 @@ function evaluate!(ttm21f::TTM21F, coords::AbstractMatrix{Float64}, grads::Union
     #-------------------------------------------------------------------------!
 
     E_elec::Float64 = electrostatics(ttm21f.elec_data, ttm21f.M_site_coords, grads_E)
-
-    #assert(m_electrostatics.dipoles_converged())
 
     # this function call might be slowing things down.
     # 
