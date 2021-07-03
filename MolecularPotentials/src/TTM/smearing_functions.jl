@@ -24,45 +24,34 @@ function smear1_ttm3(drsq::Float64, α_12::Float64, a::Float64)
 end
 
 function smear2_ttm3(drsq::Float64, α_12::Float64, a::Float64)
-    dd::Float64    = sqrt(drsq)
-    dri::Float64   = 1.0/dd
-    drsqi::Float64 = dri^2
+    dd::Float64 = sqrt(drsq)
 
     if (α_12 > eps(Float64))
-        AA::Float64   = α_12^(1.0/6.0)
-        rA::Float64   = dd/AA
-        rA3::Float64  = rA^3
-        exp1::Float64 = exp(-a*rA3)
-
-        ts1::Float64 = (1.0 - exp1)*dri*drsqi
-        ts2::Float64 = (ts1 - exp1*a/(AA^3))*drsqi
+        exp1::Float64 = exp(-a*dd^3/sqrt(α_12))
+        ts1::Float64 = (1.0 - exp1)/dd^3
+        ts2::Float64 = (ts1 - exp1*a/(sqrt(α_12)))/drsq
         return ts1, ts2
     end
-
-    ts1 = dri*drsqi
-    ts2 = ts1*drsqi
+    ts1 = dd^-3
+    ts2 = ts1/drsq
     return ts1, ts2
 end
 
 function smear3_ttm3(drsq::Float64, α_12::Float64, a::Float64)
     dd::Float64    = sqrt(drsq)
-    dri::Float64   = 1.0/dd
-    drsqi::Float64 = dri^2
 
     if (α_12 > eps(Float64))
-        AA::Float64   = α_12^(1.0/6.0)
-        rA::Float64   = dd/AA
-        rA3::Float64  = rA^3
-        exp1::Float64 = exp(-a*rA3)
+        exp1::Float64 = exp(-a*dd^3/sqrt(α_12))
 
-        ts1::Float64 = (1.0 - exp1)*dri*drsqi
-        ts2::Float64 = (ts1 - exp1*a/(AA^3))*drsqi
-        ts3::Float64 = (ts2 - 0.6*exp1*dd*a*a/α_12)*drsqi
+        ts1::Float64 = (1.0 - exp1)/dd^3
+        ts2::Float64 = (ts1 - exp1*a/(sqrt(α_12)))/drsq
+        ts3::Float64 = (ts2 - 0.6*exp1*dd*a*a/α_12)/drsq
         return ts1, ts2, ts3
     end 
-    ts1 = dri * drsqi
-    ts2 = ts1 * drsqi
-    ts3 = ts2 * drsqi
+
+    ts1 = dd^-3
+    ts2 = ts1 / drsq
+    ts3 = ts2 / drsq
     return ts1, ts2, ts3
 end
 

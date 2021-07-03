@@ -579,7 +579,7 @@ let # scope all the constants we need for this potential
         x3::Float64     = cosθ - cosθ_e
 
         efac::Float64 = exp(-C.b1D * ((norm(rOH1) - C.reoh)^2 + (norm(rOH2) - C.reoh)^2))
-        # SPEED: might be able to speed this up by making it 16,3?
+        
         fmat = zeros(16, 3)
         for i in 1:3
             fmat[1, i] = 0.0
@@ -668,11 +668,11 @@ let # scope all the constants we need for this potential
             #........ Modification of the gas-phase dipole moment surface.........
             #---------------------------------------------------------------------
     
-            AxB = @MVector zeros(3)
+            #AxB = @MVector zeros(3)
     
-            AxB[1] = rOH1[2] * rOH2[3] - rOH1[3] * rOH2[2]
-            AxB[2] =-rOH1[1] * rOH2[3] + rOH1[3] * rOH2[1]
-            AxB[3] = rOH1[1] * rOH2[2] - rOH1[2] * rOH2[1]
+            AxB = @SVector ([rOH1[2] * rOH2[3] - rOH1[3] * rOH2[2],
+                            -rOH1[1] * rOH2[3] + rOH1[3] * rOH2[1],
+                             rOH1[1] * rOH2[2] - rOH1[2] * rOH2[1]])
     
             sum0::Float64 = sum(AxB.^2)
         

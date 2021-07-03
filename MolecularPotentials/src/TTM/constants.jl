@@ -1,12 +1,13 @@
 using Parameters
 
 ####### convergence constants #######
-CHARGECON = 18.22261544733
-DEBYE = 1.0/2.081943416923e-01 # eÅ
+@inline function chargecon()
+    return 18.22261720426243437986
+end
 
-####### convergence parameters #######
-const global dipole_tolerance = 1.0e-15
-const global dipole_maxiter   = 5000
+@inline function debye()
+    return 4.8033324 # eÅ
+end
 
 abstract type TTM_Constants end
 
@@ -34,6 +35,37 @@ abstract type TTM_Constants end
     damping_factor_M::Float64 = α_O
 
     name::Symbol = :ttm21
+end
+
+@with_kw struct TTM22_Constants <: TTM_Constants
+    # vdw
+    vdwA::Float64 = -1.329565985e+6
+    vdwB::Float64 =  3.632560798e+5
+    vdwC::Float64 = -2.147141323e+3
+    vdwD::Float64 =  1.0e+13
+    vdwE::Float64 =  13.2
+    
+    # dms (start with the ttm3 modified dms)
+    dms_param1::Float64 = 0.5
+    dms_param2::Float64 = 0.9578
+    dms_param3::Float64 = 0.012
+
+    # M-site positioning
+    γ_M::Float64 = 0.426706882
+    γ_1::Float64 = 1.0 - γ_M
+    γ_2::Float64 = γ_M / 2
+
+    # polarizability
+    α_O::Float64 = 0.837
+    α_H::Float64 = 0.496
+    α_M::Float64 = 0.0
+
+    # Thole damping factors
+    damping_factor_O::Float64 = α_O
+    damping_factor_H::Float64 = α_H
+    damping_factor_M::Float64 = α_O
+
+    name::Symbol = :ttm22
 end
 
 @with_kw struct TTM3_Constants <: TTM_Constants
@@ -94,7 +126,7 @@ end
 
 # probably factor all of the qtip4pf stuff into it's own directory
 @with_kw struct qtip4pf_Constants
-    qM::Float64 = -1.1128 * CHARGECON
+    qM::Float64 = -1.1128 * chargecon()
     qH::Float64 = -qM/2
 
     rOHeq::Float64= 0.9419 # A
